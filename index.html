@@ -293,7 +293,19 @@ function evRow(ev,cb){
   const nk='notif_ev_'+ev.id, hasN=DB.get(nk,'');
   const nbtn=`<button class="notif-btn${hasN?' set':''}" onclick="toggleNotifDrop('nd_${ev.id}')">🔔 ${hasN?hasN:'Rappel'}</button>
     <div class="notif-drop" id="nd_${ev.id}">
-      <div style="font-size:11px;color:var(--subtext);margin-bottom:6px">Date & heure du rappel</div>
+      <select class="fi" style="width:100%;margin-bottom:6px" onchange="_applyQuickNotif(this.value,'nd_date_${ev.id}','nd_time_${ev.id}')">
+        <option value="">⚡ Raccourci...</option>
+        <option value="0">🕐 À l'heure de l'événement</option>
+        <option value="10">⏰ 10 min avant</option>
+        <option value="30">⏰ 30 min avant</option>
+        <option value="60">⏰ 1h avant</option>
+        <option value="120">⏰ 2h avant</option>
+        <option value="300">⏰ 5h avant</option>
+        <option value="1440">📅 1 jour avant</option>
+        <option value="2880">📅 2 jours avant</option>
+        <option value="10080">📅 1 semaine avant</option>
+      </select>
+      <div style="font-size:11px;color:var(--subtext);margin-bottom:6px">Ou choisir manuellement :</div>
       <div class="notif-row2">
         <input type="date" class="fi" style="flex:1;min-width:120px" id="nd_date_${ev.id}" value="${ev.date}">
         <input type="time" class="fi" style="width:90px" id="nd_time_${ev.id}" value="08:00">
@@ -307,7 +319,19 @@ function tkRow(tk,cb){
   const nk='notif_tk_'+tk.id, hasN=DB.get(nk,'');
   const nbtn=`<button class="notif-btn${hasN?' set':''}" onclick="toggleNotifDrop('tnd_${tk.id}')">🔔 ${hasN?hasN:'Rappel'}</button>
     <div class="notif-drop" id="tnd_${tk.id}">
-      <div style="font-size:11px;color:var(--subtext);margin-bottom:6px">Date & heure du rappel</div>
+      <select class="fi" style="width:100%;margin-bottom:6px" onchange="_applyQuickNotif(this.value,'tnd_date_${tk.id}','tnd_time_${tk.id}')">
+        <option value="">⚡ Raccourci...</option>
+        <option value="0">🕐 À l'heure de la tâche</option>
+        <option value="10">⏰ 10 min avant</option>
+        <option value="30">⏰ 30 min avant</option>
+        <option value="60">⏰ 1h avant</option>
+        <option value="120">⏰ 2h avant</option>
+        <option value="300">⏰ 5h avant</option>
+        <option value="1440">📅 1 jour avant</option>
+        <option value="2880">📅 2 jours avant</option>
+        <option value="10080">📅 1 semaine avant</option>
+      </select>
+      <div style="font-size:11px;color:var(--subtext);margin-bottom:6px">Ou choisir manuellement :</div>
       <div class="notif-row2">
         <input type="date" class="fi" style="flex:1;min-width:120px" id="tnd_date_${tk.id}" value="${tk.due||tiso()}">
         <input type="time" class="fi" style="width:90px" id="tnd_time_${tk.id}" value="08:00">
@@ -519,6 +543,20 @@ function openLst(lid,name){
 }
 function addToLst(lid,name){const v=(document.getElementById('lai')?.value||'').trim();if(!v)return;addTask(v,{lid});openLst(lid,name);}
 // NOTIFICATIONS
+function _applyQuickNotif(minutes, dateId, timeId) {
+  if(minutes === '') return;
+  const dateEl = document.getElementById(dateId);
+  const timeEl = document.getElementById(timeId);
+  if(!dateEl || !timeEl) return;
+  // Calculer la date/heure de base (date de l'event + heure actuelle si pas définie)
+  const baseDate = dateEl.value || tiso();
+  const baseTime = timeEl.value || '09:00';
+  const baseDt = new Date(baseDate + 'T' + baseTime + ':00');
+  const remDt = new Date(baseDt.getTime() - parseInt(minutes) * 60000);
+  if(remDt <= new Date()) { showToast('⚠️ Date dans le passé !'); return; }
+  dateEl.value = remDt.toISOString().slice(0, 10);
+  timeEl.value = remDt.toTimeString().slice(0, 5);
+}
 function toggleNotifDrop(id){
   const el=document.getElementById(id);
   if(!el)return;
