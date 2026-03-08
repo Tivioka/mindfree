@@ -141,7 +141,7 @@ input:checked+.sl::before{transform:translateX(20px)}
 </head>
 <body>
 <div id="app">
-  <div id="sc"></div>
+  <div id="sc" style="flex:1;overflow:hidden;display:flex;flex-direction:column"></div>
   <nav class="bnav">
     <button class="ni active" onclick="navigate(0)" id="n0">
       <svg class="ni-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9.5L12 3l9 6.5V20a1 1 0 01-1 1H5a1 1 0 01-1-1V9.5z"/><path d="M9 21V12h6v9"/></svg>
@@ -179,32 +179,37 @@ function T(){return TR[S.lang];}
 function getTasks(lid=null){const a=DB.get('tasks',[]);return lid!==null?a.filter(t=>t.lid===lid):a;}
 function addTask(title,{lid=null,notes='',due=null}={}){const a=DB.get('tasks',[]);a.push({id:Date.now(),title,lid,notes,due,done:false});DB.set('tasks',a);}
 function toggleTask(id){
-  const a=DB.get('tasks',[]);const tk=a.find(x=>x.id===id);
-  if(tk)tk.done=!tk.done;
+  const a=DB.get('tasks',[]);
+  const tk=a.find(x=>x.id===id);
+  if(tk) tk.done=!tk.done;
   DB.set('tasks',a);
-  // Live update checkbox appearance
+  // Update checkbox visually
   const chk=document.querySelector('[data-tkid="'+id+'"]');
-  const title=chk?.parentElement?.querySelector('.tk-title');
-  if(chk){chk.classList.toggle('chk',!!tk?.done);if(title)title.classList.toggle('done',!!tk?.done);}
-  // Live update progress bars
-  document.querySelectorAll('.prog-wrap').forEach(wrap=>{
+  if(chk){
+    chk.classList.toggle('chk',!!tk.done);
+    const title=chk.parentElement.querySelector('.tk-title');
+    if(title) title.classList.toggle('done',!!tk.done);
+  }
+  // Update progress bars
+  const t0=tiso(), allTasks=DB.get('tasks',[]);
+  document.querySelectorAll('.prog-wrap[data-type]').forEach(wrap=>{
     const type=wrap.dataset.type;
-    let tasks=[];
-    if(type==='today'){tasks=getTasks().filter(t=>t.due===tiso());}
-    else if(type==='all'){tasks=getTasks();}
-    else{tasks=getTasks();}
-    if(!tasks.length)return;
-    const done=tasks.filter(t=>t.done).length,total=tasks.length;
-    const pct=Math.max(done/total*100,1);
+    let subset=[];
+    if(type==='today') subset=allTasks.filter(t=>t.due===t0);
+    else if(type==='all') subset=allTasks;
+    else if(type.startsWith('list_')){
+      const lid=parseInt(type.replace('list_',''));
+      subset=allTasks.filter(t=>t.lid===lid);
+    } else return;
+    const total=subset.length;
+    if(!total) return;
+    const done=subset.filter(t=>t.done).length;
+    const pct=Math.max(Math.round(done/total*100),done>0?1:0);
+    const isDone=done===total;
     const fill=wrap.querySelector('.prog-fill');
     const val=wrap.querySelector('.prog-val');
-    if(fill)fill.style.width=pct+'%';
-    if(val){
-      const isDone=done>=total;
-      val.textContent=isDone?T().all_done:`${done}/${total} ${T().tasks_done}`;
-      val.classList.toggle('done',isDone);
-      if(fill)fill.classList.toggle('done',isDone);
-    }
+    if(fill){fill.style.width=pct+'%';fill.classList.toggle('done',isDone);}
+    if(val){val.textContent=isDone?T().all_done:done+'/'+total+' '+T().tasks_done;val.classList.toggle('done',isDone);}
   });
 }
 function delTask(id){DB.set('tasks',DB.get('tasks',[]).filter(t=>t.id!==id));}
@@ -302,43 +307,35 @@ function render(idx,dir=null){
 }
 function navigate(idx){if(idx===2){openAdd();return;}render(idx);}
 
-// SWIPE DETECTION - zone dédiée sur les bords
+// SWIPE DETECTION
 (function(){
-  let tx=0,ty=0,active=false;
+  let tx=0,ty=0,dir=null;
   const navOrder=[0,1,3,4];
-  const EDGE=60; // px depuis le bord pour déclencher le swipe
-  
-  document.addEventListener('touchstart',e=>{
-    const x=e.touches[0].clientX;
-    const sw=window.innerWidth;
-    // Activer seulement si on commence depuis le bord gauche ou droit
-    if(x<EDGE||x>sw-EDGE){
-      tx=x; ty=e.touches[0].clientY; active=true;
-    } else {
-      active=false;
-    }
+  const sc=()=>document.getElementById('sc');
+
+  sc().addEventListener('touchstart',e=>{
+    tx=e.touches[0].clientX;
+    ty=e.touches[0].clientY;
+    dir=null;
   },{passive:true});
 
-  document.addEventListener('touchmove',e=>{
-    if(!active)return;
+  sc().addEventListener('touchmove',e=>{
+    if(dir)return;
     const dx=Math.abs(e.touches[0].clientX-tx);
     const dy=Math.abs(e.touches[0].clientY-ty);
-    // Si clairement horizontal, bloquer le scroll
-    if(dx>dy&&dx>10){
-      e.preventDefault();
-    }
+    if(dx<5&&dy<5)return;
+    dir=dx>dy?'h':'v';
+    if(dir==='h')e.preventDefault();
   },{passive:false});
 
-  document.addEventListener('touchend',e=>{
-    if(!active){active=false;return;}
-    active=false;
+  sc().addEventListener('touchend',e=>{
+    if(dir!=='h')return;
     if(document.getElementById('ov').classList.contains('open'))return;
     const dx=e.changedTouches[0].clientX-tx;
-    const dy=e.changedTouches[0].clientY-ty;
-    if(Math.abs(dx)<50||Math.abs(dy)>Math.abs(dx))return;
+    if(Math.abs(dx)<50)return;
     const cur=navOrder.indexOf(S.nav);
-    if(dx<0&&cur<navOrder.length-1){render(navOrder[cur+1],'slide-right');}
-    else if(dx>0&&cur>0){render(navOrder[cur-1],'slide-left');}
+    if(dx<0&&cur<navOrder.length-1)render(navOrder[cur+1],'slide-right');
+    else if(dx>0&&cur>0)render(navOrder[cur-1],'slide-left');
   },{passive:true});
 })();
 function updateNav(){const ids=[0,1,3,4],lbls=[T().home,T().calendar,T().tasks,T().settings];ids.forEach((id,i)=>{const el=document.getElementById('nl'+id);if(el)el.textContent=lbls[i];});}
