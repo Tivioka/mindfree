@@ -561,8 +561,87 @@ if('Notification' in window && Notification.permission==='default'){
   }),2000);
 }
 
-// SW
-if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js').catch(()=>{});
+// ─── FIREBASE FCM ────────────────────────────────────────────────
+const _FCM_CONFIG = {
+  apiKey: "AIzaSyBzk9byhN_QYgp5zY7mq6aRodTSLG3NnIM",
+  authDomain: "mindfree-b0d05.firebaseapp.com",
+  projectId: "mindfree-b0d05",
+  storageBucket: "mindfree-b0d05.firebasestorage.app",
+  messagingSenderId: "734963657032",
+  appId: "1:734963657032:web:eee23fa7f7ff841fe16b7d"
+};
+const _VAPID = "BGqv52VWhuEbcAgbo9S2bEUJXXKeIwG08DwdpzE2tAo-YGsimMRBSiQO_bBtJx7tR-vZmw78Y3VOANM8mjVjGnc";
+
+let _fcmToken = null;
+
+async function initFCM() {
+  try {
+    // Import Firebase
+    const { initializeApp } = await import('https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js');
+    const { getMessaging, getToken, onMessage } = await import('https://www.gstatic.com/firebasejs/10.7.1/firebase-messaging.js');
+
+    const app = initializeApp(_FCM_CONFIG);
+    const messaging = getMessaging(app);
+
+    // Register SW
+    const swReg = await navigator.serviceWorker.register('sw.js');
+    await navigator.serviceWorker.ready;
+
+    // Request permission
+    const perm = await Notification.requestPermission();
+    if(perm !== 'granted') {
+      console.log('Notif permission denied');
+      return;
+    }
+
+    // Get FCM token
+    _fcmToken = await getToken(messaging, {
+      vapidKey: _VAPID,
+      serviceWorkerRegistration: swReg
+    });
+
+    if(_fcmToken) {
+      DB.set('fcm_token', _fcmToken);
+      console.log('FCM token OK:', _fcmToken.slice(0,20)+'...');
+    }
+
+    // Handle foreground messages
+    onMessage(messaging, payload => {
+      const {title, body} = payload.notification || {};
+      if(title) showToast('🔔 ' + (body || title));
+    });
+
+  } catch(e) {
+    console.warn('FCM init failed, fallback mode:', e.message);
+    // Fallback: register SW only
+    if('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('sw.js').catch(()=>{});
+    }
+  }
+}
+
+// Override scheduleNotif to use FCM-aware SW
+async function _sendScheduledViaWorker(title, timeMs, key) {
+  try {
+    const swReg = await navigator.serviceWorker.ready;
+    swReg.active?.postMessage({ type:'SCHEDULE_NOTIF', title, time:timeMs, key });
+  } catch(e) {}
+}
+
+// Patch scheduleNotif to also send to SW
+const _origSchedule = scheduleNotif;
+window.scheduleNotif = function(title, dt, key) {
+  _origSchedule(title, dt, key);
+  const timeMs = dt instanceof Date ? dt.getTime() : new Date(dt).getTime();
+  _sendScheduledViaWorker(title, timeMs, String(key));
+};
+
+// Init
+if('serviceWorker' in navigator && 'Notification' in window) {
+  window.addEventListener('load', () => initFCM());
+} else {
+  if('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(()=>{});
+}
 
 // ═══════════════════════════════════════════
 //  NOTIFICATION SYSTEM
