@@ -595,7 +595,7 @@ if('Notification' in window && Notification.permission==='default'){
 // ─── FIREBASE FCM ────────────────────────────────────────────────
 const _FCM_CONFIG = {
   apiKey: "AIzaSyBzk9byhN_QYgp5zY7mq6aRodTSLG3NnIM",
-  authDomain: "mindfree-b0d05.firebaseapp.com",
+  authDomain: "mindfree-b0d05.firebaseapp.com", // keep this exact
   projectId: "mindfree-b0d05",
   storageBucket: "mindfree-b0d05.firebasestorage.app",
   messagingSenderId: "734963657032",
@@ -621,14 +621,20 @@ async function initFCM() {
     window._fsSignIn = async () => {
       try {
         const provider = new GoogleAuthProvider();
-        await signInWithRedirect(auth, provider);
-      } catch(e) { showToast('❌ Connexion échouée'); }
+        provider.setCustomParameters({prompt: 'select_account'});
+        const result = await signInWithPopup(auth, provider);
+        if(result?.user) showToast('✅ Connecté : ' + result.user.displayName);
+      } catch(e) {
+        console.warn('Auth error:', e.code, e.message);
+        if(e.code === 'auth/popup-blocked') {
+          showToast('❌ Autorise les popups pour ce site dans Chrome');
+        } else if(e.code === 'auth/cancelled-popup-request') {
+          // ignore
+        } else {
+          showToast('❌ Erreur : ' + e.code);
+        }
+      }
     };
-    // Récupérer le résultat après redirect
-    try {
-      const result = await getRedirectResult(auth);
-      if(result?.user) showToast('✅ Connecté !');
-    } catch(e) { console.warn('Redirect result:', e); }
 
     // Auth state
     onAuthStateChanged(auth, async user => {
