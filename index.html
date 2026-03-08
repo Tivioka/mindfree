@@ -293,8 +293,8 @@ function evRow(ev,cb){
   const nk='notif_ev_'+ev.id, hasN=DB.get(nk,'');
   const nbtn=`<button class="notif-btn${hasN?' set':''}" onclick="toggleNotifDrop('nd_${ev.id}')">🔔 ${hasN?hasN:'Rappel'}</button>
     <div class="notif-drop" id="nd_${ev.id}">
-      <select class="fi" style="width:100%;margin-bottom:6px" onchange="_applyQuickNotif(this.value,'nd_date_${ev.id}','nd_time_${ev.id}')">
-        <option value="">⚡ Raccourci...</option>
+      <select class="fi" style="width:100%;margin-bottom:8px" id="nd_sel_${ev.id}">
+        <option value="">Choisir un rappel...</option>
         <option value="0">🕐 À l'heure de l'événement</option>
         <option value="10">⏰ 10 min avant</option>
         <option value="30">⏰ 30 min avant</option>
@@ -305,12 +305,9 @@ function evRow(ev,cb){
         <option value="2880">📅 2 jours avant</option>
         <option value="10080">📅 1 semaine avant</option>
       </select>
-      <div style="font-size:11px;color:var(--subtext);margin-bottom:6px">Ou choisir manuellement :</div>
-      <div class="notif-row2">
-        <input type="date" class="fi" style="flex:1;min-width:120px" id="nd_date_${ev.id}" value="${ev.date}">
-        <input type="time" class="fi" style="width:90px" id="nd_time_${ev.id}" value="08:00">
-        <button class="btn btn-p" style="flex:none;padding:8px 12px;font-size:12px" onclick="saveNotif('ev',${ev.id},'${ev.title.replace(/'/g,"\'")}')">OK</button>
-        ${hasN?`<button class="btn btn-g" style="flex:none;padding:8px 12px;font-size:12px" onclick="delNotif('${nk}','nd_${ev.id}')">✕</button>`:''}
+      <div style="display:flex;gap:6px">
+        <button class="btn btn-p" style="flex:1;padding:8px 12px;font-size:12px" onclick="saveNotifQuick('ev',${ev.id},'${ev.title.replace(/'/g,"\'")}','${ev.date}','${ev.time||''}','nd_sel_${ev.id}')">🔔 Programmer</button>
+        ${hasN?`<button class="btn btn-g" style="padding:8px 12px;font-size:12px" onclick="delNotif('${nk}','nd_${ev.id}')">✕ Supprimer</button>`:''}
       </div>
     </div>`;
   return `<div class="card"><div class="ev-row"><span class="ev-icon">${ic}</span><div class="ev-body"><div class="ev-title">${ev.title}</div><div class="ev-sub" style="color:${col}">${lb} · ${ev.date}${ev.time?" à "+ev.time:""}</div><div style="margin-top:6px">${nbtn}</div></div><button class="del" onclick="delEvent(${ev.id});${cb}">🗑</button></div></div>`;
@@ -319,8 +316,8 @@ function tkRow(tk,cb){
   const nk='notif_tk_'+tk.id, hasN=DB.get(nk,'');
   const nbtn=`<button class="notif-btn${hasN?' set':''}" onclick="toggleNotifDrop('tnd_${tk.id}')">🔔 ${hasN?hasN:'Rappel'}</button>
     <div class="notif-drop" id="tnd_${tk.id}">
-      <select class="fi" style="width:100%;margin-bottom:6px" onchange="_applyQuickNotif(this.value,'tnd_date_${tk.id}','tnd_time_${tk.id}')">
-        <option value="">⚡ Raccourci...</option>
+      <select class="fi" style="width:100%;margin-bottom:8px" id="tnd_sel_${tk.id}">
+        <option value="">Choisir un rappel...</option>
         <option value="0">🕐 À l'heure de la tâche</option>
         <option value="10">⏰ 10 min avant</option>
         <option value="30">⏰ 30 min avant</option>
@@ -331,12 +328,9 @@ function tkRow(tk,cb){
         <option value="2880">📅 2 jours avant</option>
         <option value="10080">📅 1 semaine avant</option>
       </select>
-      <div style="font-size:11px;color:var(--subtext);margin-bottom:6px">Ou choisir manuellement :</div>
-      <div class="notif-row2">
-        <input type="date" class="fi" style="flex:1;min-width:120px" id="tnd_date_${tk.id}" value="${tk.due||tiso()}">
-        <input type="time" class="fi" style="width:90px" id="tnd_time_${tk.id}" value="08:00">
-        <button class="btn btn-p" style="flex:none;padding:8px 12px;font-size:12px" onclick="saveNotif('tk',${tk.id},'${tk.title.replace(/'/g,"\'")}')">OK</button>
-        ${hasN?`<button class="btn btn-g" style="flex:none;padding:8px 12px;font-size:12px" onclick="delNotif('${nk}','tnd_${tk.id}')">✕</button>`:''}
+      <div style="display:flex;gap:6px">
+        <button class="btn btn-p" style="flex:1;padding:8px 12px;font-size:12px" onclick="saveNotifQuick('tk',${tk.id},'${tk.title.replace(/'/g,"\'")}','${tk.due||tiso()}','${tk.time||''}','tnd_sel_${tk.id}')">🔔 Programmer</button>
+        ${hasN?`<button class="btn btn-g" style="padding:8px 12px;font-size:12px" onclick="delNotif('${nk}','tnd_${tk.id}')">✕ Supprimer</button>`:''}
       </div>
     </div>`;
   return `<div class="card"><div class="tk-row"><div class="tk-check${tk.done?' chk':''}" data-tkid="${tk.id}" onclick="toggleTask(${tk.id});${cb}"></div><div class="tk-body"><div class="tk-title${tk.done?' done':''}">${tk.title}</div>${tk.notes?`<div class="tk-note">${tk.notes}</div>`:''}${tk.time?`<div class="tk-note">🕐 ${tk.time}</div>`:''}<div style="margin-top:4px">${nbtn}</div></div><button class="del" onclick="delTask(${tk.id});${cb}">🗑</button></div></div>`;
@@ -558,19 +552,16 @@ function openLst(lid,name){
 }
 function addToLst(lid,name){const v=(document.getElementById('lai')?.value||'').trim();if(!v)return;addTask(v,{lid});openLst(lid,name);}
 // NOTIFICATIONS
-function _applyQuickNotif(minutes, dateId, timeId) {
-  if(minutes === '') return;
-  const dateEl = document.getElementById(dateId);
-  const timeEl = document.getElementById(timeId);
-  if(!dateEl || !timeEl) return;
-  // Calculer la date/heure de base (date de l'event + heure actuelle si pas définie)
-  const baseDate = dateEl.value || tiso();
-  const baseTime = timeEl.value || '09:00';
-  const baseDt = new Date(baseDate + 'T' + baseTime + ':00');
-  const remDt = new Date(baseDt.getTime() - parseInt(minutes) * 60000);
-  if(remDt <= new Date()) { showToast('⚠️ Date dans le passé !'); return; }
-  dateEl.value = remDt.toISOString().slice(0, 10);
-  timeEl.value = remDt.toTimeString().slice(0, 5);
+function _applyQuickNotif(minutes, selectId) {
+  // Stocke juste la valeur sélectionnée, le calcul se fait au save
+  window._quickNotifVal = window._quickNotifVal || {};
+  window._quickNotifVal[selectId] = minutes;
+}
+function _calcNotifTime(itemDate, itemTime, minutesBefore) {
+  // Calcule l'heure du rappel à partir de la date/heure de l'item
+  const time = itemTime || '09:00';
+  const dt = new Date(itemDate + 'T' + time + ':00');
+  return new Date(dt.getTime() - parseInt(minutesBefore) * 60000);
 }
 function toggleNotifDrop(id){
   const el=document.getElementById(id);
@@ -578,18 +569,25 @@ function toggleNotifDrop(id){
   document.querySelectorAll('.notif-drop.open').forEach(d=>{if(d.id!==id)d.classList.remove('open');});
   el.classList.toggle('open');
 }
-function saveNotif(type,id,title){
-  const prefix=type==='ev'?'nd_':'tnd_';
-  const date=document.getElementById(prefix+'date_'+id)?.value||tiso();
-  const time=document.getElementById(prefix+'time_'+id)?.value||'08:00';
-  const dt=new Date(date+'T'+time+':00');
-  if(dt<=new Date()){showToast('⚠️ Date dans le passé !');return;}
-  const nk='notif_'+(type==='ev'?'ev':'tk')+'_'+id;
-  const label=date+' '+time;
-  DB.set(nk,label);
-  scheduleNotif(title,dt,nk);
-  document.getElementById(prefix+id)?.classList.remove('open');
+function saveNotifQuick(type, id, title, itemDate, itemTime, selId) {
+  const sel = document.getElementById(selId);
+  if(!sel || sel.value === '') { showToast('⚠️ Choisis un rappel'); return; }
+  const minutes = parseInt(sel.value);
+  const time = itemTime || '09:00';
+  const dt = _calcNotifTime(itemDate, time, minutes);
+  if(dt <= new Date()) { showToast('⚠️ Ce rappel est dans le passé !'); return; }
+  const nk = 'notif_'+(type==='ev'?'ev':'tk')+'_'+id;
+  const label = dt.toLocaleDateString(S.lang==='fr'?'fr-FR':'en-US',{day:'numeric',month:'short'})
+    + ' à ' + dt.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
+  DB.set(nk, label);
+  scheduleNotif(title, dt, nk);
+  const dropId = (type==='ev'?'nd_':'tnd_') + id;
+  document.getElementById(dropId)?.classList.remove('open');
   render(S.nav);
+}
+function saveNotif(type,id,title){
+  // Gardé pour compatibilité
+  saveNotifQuick(type,id,title,tiso(),'09:00',(type==='ev'?'nd_':'tnd_')+'sel_'+id);
 }
 function delNotif(nk,dropId){
   DB.set(nk,'');
